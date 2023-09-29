@@ -295,21 +295,24 @@ def pathSearch(startpos, endpos, obstacles, n_iter, radius, stepSize):
 
 if __name__ == '__main__':
 
+    #Move this section into main of auto_fruit_search
     fruits_list, fruits_true_pos, aruco_true_pos = read_true_map(args.map)
     search_list = read_search_list()
     print_target_fruits_pos(search_list, fruits_list, fruits_true_pos)
     coords_order = target_fruits_pos_order(search_list, fruits_list, fruits_true_pos) # order of coords to go to for each fruit
 
     startpos = (0., 0.)
-    obstacles = fruits_true_pos + aruco_true_pos
+    obstacles = fruits_true_pos + aruco_true_pos # merging list of obstacles together (Aruco markers and Fruits)
+
+    # Change these values as needed
     n_iter = 20
-    radius = 0.05
+    radius = 0.1
     stepSize = 0.7
 
     for target in coords_order: #loop for every shopping list target
 
         # need to add so it is not targeting exactly on fruit?
-        endpos = target
+        endpos = (target[0], target[1])
         # RRT star
         G = RRT_star(startpos, endpos, obstacles, n_iter, radius, stepSize)
 
@@ -334,3 +337,4 @@ if __name__ == '__main__':
         
         # move startpos to endpos now
         startpos = endpos
+
