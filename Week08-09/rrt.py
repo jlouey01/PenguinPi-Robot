@@ -9,9 +9,9 @@ from random import random
 import matplotlib.pyplot as plt
 from matplotlib import collections  as mc
 from collections import deque
+import time
 
 class Line():
-  ''' Define line '''
     def __init__(self, p0, p1):
         self.p = np.array(p0)
         self.dirn = np.array(p1) - np.array(p0)
@@ -23,7 +23,6 @@ class Line():
 
 
 def Intersection(line, center, radius):
-  ''' Check line-sphere (circle) intersection '''
     a = np.dot(line.dirn, line.dirn)
     b = 2 * np.dot(line.dirn, line.p - center)
     c = np.dot(line.p - center, line.p - center) - radius * radius
@@ -89,7 +88,6 @@ def newVertex(randvex, nearvex, stepSize):
 
 
 def window(startpos, endpos):
-  ''' Define seach window - 2 times of start to end rectangle'''
     width = endpos[0] - startpos[0]
     height = endpos[1] - startpos[1]
     winx = startpos[0] - (width / 2.)
@@ -98,7 +96,6 @@ def window(startpos, endpos):
 
 
 def isInWindow(pos, winx, winy, width, height):
-  ''' Restrict new vertex insides search window'''
     if winx < pos[0] < winx+width and \
         winy < pos[1] < winy+height:
         return True
@@ -107,7 +104,6 @@ def isInWindow(pos, winx, winy, width, height):
 
 
 class Graph:
-''' Define graph '''
     def __init__(self, startpos, endpos):
         self.startpos = startpos
         self.endpos = endpos
@@ -149,7 +145,6 @@ class Graph:
 
 
 def RRT(startpos, endpos, obstacles, n_iter, radius, stepSize):
-  ''' RRT algorithm '''
     G = Graph(startpos, endpos)
 
     for _ in range(n_iter):
@@ -178,7 +173,6 @@ def RRT(startpos, endpos, obstacles, n_iter, radius, stepSize):
 
 
 def RRT_star(startpos, endpos, obstacles, n_iter, radius, stepSize):
-  ''' RRT star algorithm '''
     G = Graph(startpos, endpos)
 
     for _ in range(n_iter):
@@ -232,9 +226,6 @@ def RRT_star(startpos, endpos, obstacles, n_iter, radius, stepSize):
 
 
 def dijkstra(G):
-  '''
-  Dijkstra algorithm for finding shortest path from start position to end.
-  '''
     srcIdx = G.vex2idx[G.startpos]
     dstIdx = G.vex2idx[G.endpos]
 
@@ -268,9 +259,6 @@ def dijkstra(G):
 
 
 def plot(G, obstacles, radius, path=None):
-  '''
-  Plot RRT, obstacles and shortest path
-  '''
     px = [x for x, y in G.vertices]
     py = [y for x, y in G.vertices]
     fig, ax = plt.subplots()
@@ -306,19 +294,43 @@ def pathSearch(startpos, endpos, obstacles, n_iter, radius, stepSize):
 
 
 if __name__ == '__main__':
+
+    fruits_list, fruits_true_pos, aruco_true_pos = read_true_map(args.map)
+    search_list = read_search_list()
+    print_target_fruits_pos(search_list, fruits_list, fruits_true_pos)
+    coords_order = target_fruits_pos_order(search_list, fruits_list, fruits_true_pos) # order of coords to go to for each fruit
+
     startpos = (0., 0.)
-    endpos = (5., 5.)
-    obstacles = [(1., 1.), (2., 2.)]
-    n_iter = 200
-    radius = 0.5
+    obstacles = fruits_true_pos + aruco_true_pos
+    n_iter = 20
+    radius = 0.05
     stepSize = 0.7
 
-    G = RRT_star(startpos, endpos, obstacles, n_iter, radius, stepSize)
-    # G = RRT(startpos, endpos, obstacles, n_iter, radius, stepSize)
+    for target in coords_order: #loop for every shopping list target
 
-    if G.success:
-        path = dijkstra(G)
-        print(path)
-        plot(G, obstacles, radius, path)
-    else:
-        plot(G, obstacles, radius)
+        # need to add so it is not targeting exactly on fruit?
+        endpos = target
+        # RRT star
+        G = RRT_star(startpos, endpos, obstacles, n_iter, radius, stepSize)
+
+        # If path available
+        if G.success:
+            path = dijkstra(G)
+            print(path)
+            plot(G, obstacles, radius, path)
+        else:
+            print("No path available")
+        
+        # drive robot
+        for drive in path:
+            robot_pose, clock = get_robot_pose(clock) # need to fix so it is right
+            waypoint = drive # setting each waypoint in the path
+            drive_to_point(waypoint,robot_pose)
+            ppi.set_velocity([0, 0])
+
+        #Stop for 2 seconds
+        print("Arrived at target")
+        time.sleep(2)
+        
+        # move startpos to endpos now
+        startpos = endpos
