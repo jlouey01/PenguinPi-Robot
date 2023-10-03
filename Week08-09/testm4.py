@@ -7,6 +7,10 @@ import cv2
 import numpy as np
 import argparse
 import json
+from random import random
+import matplotlib.pyplot as plt
+from matplotlib import collections  as mc
+from collections import deque
 
 # import utility functions
 sys.path.insert(0, "{}/util".format(os.getcwd()))
@@ -340,7 +344,7 @@ class Operate:
             2) locations of the targets, [[x1, y1], ..... [xn, yn]]
             3) locations of ArUco markers in order, i.e. pos[9, :] = position of the aruco10_0 marker
         """
-        fname = 'Truemap.txt'
+        fname = 'party_room.txt' # CHANGE for reading true map
         with open(fname, 'r') as fd:
             gt_dict = json.load(fd)
             fruit_list = []
@@ -404,6 +408,17 @@ class Operate:
                                                     np.round(fruit_true_pos[i][1], 1)))
             n_fruit += 1
 
+    
+    def target_fruits_pos_order(self, search_list, fruit_list, fruit_true_pos):
+        coords_order = []
+        for fruit in search_list:
+            for i in range(len(fruit_list)): # there are 5 targets amongst 10 objects
+                if fruit == fruit_list[i]:
+                    x = np.round(fruit_true_pos[i][0], 1)
+                    y = np.round(fruit_true_pos[i][1], 1)
+                    coords = (x,y)
+                    coords_order.append(coords)
+        return coords_order
 
     # Waypoint navigation
     # the robot automatically drives to a given [x,y] coordinate
@@ -463,12 +478,293 @@ class Operate:
         ####################################################
         # TODO: replace with your codes to estimate the pose of the robot
         # We STRONGLY RECOMMEND you to use your SLAM code from M2 here
-        drive_meas = operate.control()
-        operate.update_slam(drive_meas)
-        robot_pose = self.ekf.get_state_vector()
-        print("Robot pose is", robot_pose)
+        # drive_meas = operate.control()
+        # operate.update_slam(drive_meas)
+        robot_pose = self.ekf.get_state_vector()[:3]
+        #print("Robot pose is", robot_pose)
         return robot_pose
 
+
+class Line():
+    def __init__(self, p0, p1):
+        self.p = np.array(p0)
+        self.dirn = np.array(p1) - np.array(p0)
+        self.dist = np.linalg.norm(self.dirn)
+        self.dirn /= self.dist # normalize
+
+    def path(self, t):
+        return self.p + t * self.dirn
+
+
+def Intersection(line, center, radius):
+    a = np.dot(line.dirn, line.dirn)
+    b = 2 * np.dot(line.dirn, line.p - center)
+    c = np.dot(line.p - center, line.p - center) - radius * radius
+
+    discriminant = b * b - 4 * a * c
+    if discriminant < 0:
+        return False
+
+    t1 = (-b + np.sqrt(discriminant)) / (2 * a);
+    t2 = (-b - np.sqrt(discriminant)) / (2 * a);
+
+    if (t1 < 0 and t2 < 0) or (t1 > line.dist and t2 > line.dist):
+        return False
+
+    return True
+
+
+
+def distance(x, y):
+    return np.linalg.norm(np.array(x) - np.array(y))
+
+
+def isInObstacle(vex, obstacles, radius):
+    for obs in obstacles:
+        if distance(obs, vex) < radius:
+            return True
+    return False
+
+
+def isThruObstacle(line, obstacles, radius):
+    for obs in obstacles:
+        if Intersection(line, obs, radius):
+            return True
+    return False
+
+
+def nearest(G, vex, obstacles, radius):
+    Nvex = None
+    Nidx = None
+    minDist = float("inf")
+
+    for idx, v in enumerate(G.vertices):
+        line = Line(v, vex)
+        if isThruObstacle(line, obstacles, radius):
+            continue
+
+        dist = distance(v, vex)
+        if dist < minDist:
+            minDist = dist
+            Nidx = idx
+            Nvex = v
+
+    return Nvex, Nidx
+
+
+def newVertex(randvex, nearvex, stepSize):
+    dirn = np.array(randvex) - np.array(nearvex)
+    length = np.linalg.norm(dirn)
+    dirn = (dirn / length) * min (stepSize, length)
+
+    newvex = (nearvex[0]+dirn[0], nearvex[1]+dirn[1])
+    return newvex
+
+
+def window(startpos, endpos):
+    width = endpos[0] - startpos[0]
+    height = endpos[1] - startpos[1]
+    winx = startpos[0] - (width / 2.)
+    winy = startpos[1] - (height / 2.)
+    return winx, winy, width, height
+
+
+def isInWindow(pos, winx, winy, width, height):
+    if winx < pos[0] < winx+width and \
+        winy < pos[1] < winy+height:
+        return True
+    else:
+        return False
+
+
+class Graph:
+    def __init__(self, startpos, endpos):
+        self.startpos = startpos
+        self.endpos = endpos
+
+        self.vertices = [startpos]
+        self.edges = []
+        self.success = False
+
+        self.vex2idx = {startpos:0}
+        self.neighbors = {0:[]}
+        self.distances = {0:0.}
+
+        self.sx = endpos[0] - startpos[0]
+        self.sy = endpos[1] - startpos[1]
+
+    def add_vex(self, pos):
+        try:
+            idx = self.vex2idx[pos]
+        except:
+            idx = len(self.vertices)
+            self.vertices.append(pos)
+            self.vex2idx[pos] = idx
+            self.neighbors[idx] = []
+        return idx
+
+    def add_edge(self, idx1, idx2, cost):
+        self.edges.append((idx1, idx2))
+        self.neighbors[idx1].append((idx2, cost))
+        self.neighbors[idx2].append((idx1, cost))
+
+
+    def randomPosition(self):
+        rx = random()
+        ry = random()
+
+        posx = self.startpos[0] - (self.sx / 2.) + rx * self.sx * 2
+        posy = self.startpos[1] - (self.sy / 2.) + ry * self.sy * 2
+        return posx, posy
+
+
+def RRT(startpos, endpos, obstacles, n_iter, radius, stepSize):
+    G = Graph(startpos, endpos)
+
+    for _ in range(n_iter):
+        randvex = G.randomPosition()
+        if isInObstacle(randvex, obstacles, radius):
+            continue
+
+        nearvex, nearidx = nearest(G, randvex, obstacles, radius)
+        if nearvex is None:
+            continue
+
+        newvex = newVertex(randvex, nearvex, stepSize)
+
+        newidx = G.add_vex(newvex)
+        dist = distance(newvex, nearvex)
+        G.add_edge(newidx, nearidx, dist)
+
+        dist = distance(newvex, G.endpos)
+        if dist < 2 * radius:
+            endidx = G.add_vex(G.endpos)
+            G.add_edge(newidx, endidx, dist)
+            G.success = True
+            #print('success')
+            # break
+    return G
+
+
+def RRT_star(startpos, endpos, obstacles, n_iter, radius, stepSize):
+    G = Graph(startpos, endpos)
+
+    for _ in range(n_iter):
+        randvex = G.randomPosition()
+        if isInObstacle(randvex, obstacles, radius):
+            continue
+
+        nearvex, nearidx = nearest(G, randvex, obstacles, radius)
+        if nearvex is None:
+            continue
+
+        newvex = newVertex(randvex, nearvex, stepSize)
+
+        newidx = G.add_vex(newvex)
+        dist = distance(newvex, nearvex)
+        G.add_edge(newidx, nearidx, dist)
+        G.distances[newidx] = G.distances[nearidx] + dist
+
+        # update nearby vertices distance (if shorter)
+        for vex in G.vertices:
+            if vex == newvex:
+                continue
+
+            dist = distance(vex, newvex)
+            if dist > radius:
+                continue
+
+            line = Line(vex, newvex)
+            if isThruObstacle(line, obstacles, radius):
+                continue
+
+            idx = G.vex2idx[vex]
+            if G.distances[newidx] + dist < G.distances[idx]:
+                G.add_edge(idx, newidx, dist)
+                G.distances[idx] = G.distances[newidx] + dist
+
+        dist = distance(newvex, G.endpos)
+        if dist < 2 * radius:
+            endidx = G.add_vex(G.endpos)
+            G.add_edge(newidx, endidx, dist)
+            try:
+                G.distances[endidx] = min(G.distances[endidx], G.distances[newidx]+dist)
+            except:
+                G.distances[endidx] = G.distances[newidx]+dist
+
+            G.success = True
+            #print('success')
+            # break
+    return G
+
+
+
+def dijkstra(G):
+    srcIdx = G.vex2idx[G.startpos]
+    dstIdx = G.vex2idx[G.endpos]
+
+    # build dijkstra
+    nodes = list(G.neighbors.keys())
+    dist = {node: float('inf') for node in nodes}
+    prev = {node: None for node in nodes}
+    dist[srcIdx] = 0
+
+    while nodes:
+        curNode = min(nodes, key=lambda node: dist[node])
+        nodes.remove(curNode)
+        if dist[curNode] == float('inf'):
+            break
+
+        for neighbor, cost in G.neighbors[curNode]:
+            newCost = dist[curNode] + cost
+            if newCost < dist[neighbor]:
+                dist[neighbor] = newCost
+                prev[neighbor] = curNode
+
+    # retrieve path
+    path = deque()
+    curNode = dstIdx
+    while prev[curNode] is not None:
+        path.appendleft(G.vertices[curNode])
+        curNode = prev[curNode]
+    path.appendleft(G.vertices[curNode])
+    return list(path)
+
+
+
+def plot(G, obstacles, radius, path=None):
+    px = [x for x, y in G.vertices]
+    py = [y for x, y in G.vertices]
+    fig, ax = plt.subplots()
+
+    for obs in obstacles:
+        circle = plt.Circle(obs, radius, color='red')
+        ax.add_artist(circle)
+
+    ax.scatter(px, py, c='cyan')
+    ax.scatter(G.startpos[0], G.startpos[1], c='black')
+    ax.scatter(G.endpos[0], G.endpos[1], c='black')
+
+    lines = [(G.vertices[edge[0]], G.vertices[edge[1]]) for edge in G.edges]
+    lc = mc.LineCollection(lines, colors='green', linewidths=2)
+    ax.add_collection(lc)
+
+    if path is not None:
+        paths = [(path[i], path[i+1]) for i in range(len(path)-1)]
+        lc2 = mc.LineCollection(paths, colors='blue', linewidths=3)
+        ax.add_collection(lc2)
+
+    ax.autoscale()
+    ax.margins(0.1)
+    plt.show()
+
+
+def pathSearch(startpos, endpos, obstacles, n_iter, radius, stepSize):
+    G = RRT_star(startpos, endpos, obstacles, n_iter, radius, stepSize)
+    if G.success:
+        path = dijkstra(G)
+        # plot(G, obstacles, radius, path)
+        return path
 
 if __name__ == "__main__":
     import argparse
@@ -480,7 +776,7 @@ if __name__ == "__main__":
     parser.add_argument("--save_data", action='store_true')
     parser.add_argument("--play_data", action='store_true')
     parser.add_argument("--yolo_model", default='YOLO/model/yolov8_model_2.pt')
-    parser.add_argument("--map", type=str, default='M4_true_map_full.txt') # change to 'M4_true_map_part.txt' for lv2&3
+    parser.add_argument("--map", type=str, default='party_room.txt') # CHANGE to 'M4_true_map_part.txt' for lv2&3
     args, _ = parser.parse_known_args()
 
     pygame.font.init()
@@ -517,16 +813,11 @@ if __name__ == "__main__":
 
     operate = Operate(args)
     # read in the true map
-    fruits_list, fruits_true_pos, aruco_true_pos = operate.read_true_map(args.map)
-    search_list = operate.read_search_list()
-    operate.print_target_fruits_pos(search_list, fruits_list, fruits_true_pos)
-    waypoint = [0.0,0.0]
-    robot_pose = [0.0,0.0,0.0]
 
     operate.run_slam() # initializes slam
 
     while start:
-        operate.update_keyboard()
+        #operate.update_keyboard()
         operate.take_pic()
         drive_meas = operate.control()
         operate.update_slam(drive_meas)
@@ -537,38 +828,72 @@ if __name__ == "__main__":
         operate.draw(canvas)
         pygame.display.update()
 
+        # enter the waypoints
+        # instead of manually enter waypoints, you can give coordinates by clicking on a map, see camera_calibration.py from M2
 
         while True:
-            # enter the waypoints
-            # instead of manually enter waypoints, you can give coordinates by clicking on a map, see camera_calibration.py from M2
-            x,y = 0.0,0.0
-            x = input("X coordinate of the waypoint: ")
-            try:
-                x = float(x)
-            except ValueError:
-                print("Please enter a number.")
-                continue
-            y = input("Y coordinate of the waypoint: ")
-            try:
-                y = float(y)
-            except ValueError:
-                print("Please enter a number.")
-                continue
-
+            operate.take_pic()
+            drive_meas = operate.control()
+            operate.update_slam(drive_meas)
+            operate.record_data()
+            operate.save_image()
+            operate.detect_target()
             # estimate the robot's pose
             robot_pose = operate.get_robot_pose()
-            
+            #print("robot pose is: ", robot_pose)
 
-            # robot drives to the waypoint
-            waypoint = [x,y]
-            operate.drive_to_point(waypoint,robot_pose)
-            print("Finished driving to waypoint: {}; New robot pose: {}".format(waypoint,robot_pose))
-            
-            robot_pose = operate.get_robot_pose()
+            #Move this section into main of auto_fruit_search
+            fruits_list, fruits_true_pos, aruco_true_pos = operate.read_true_map(args.map)
+            search_list = operate.read_search_list()
+            operate.print_target_fruits_pos(search_list, fruits_list, fruits_true_pos)
+            coords_order = operate.target_fruits_pos_order(search_list, fruits_list, fruits_true_pos) # order of coords to go to for each fruit
 
-            # exit
-            operate.pibot.set_velocity([0, 0])
-            uInput = input("Add a new waypoint? [Y/N]")
-            if uInput == 'N':
-                break
+            startpos = (0., 0.)
+            obstacles = np.concatenate((fruits_true_pos, aruco_true_pos))  # merging list of obstacles together (Aruco markers and Fruits)
+
+            
+            # Change these values as needed
+            n_iter = 50
+            radius = 0.1
+            stepSize = 0.5
+
+            for target in coords_order: #loop for every shopping list target
+
+                #print(target)
+                endpos = (target[0]+0.2, target[1]+0.2)# need to add so it is not targeting exactly on fruit?
+                #print(endpos)
+
+                ## RRT star
+                #print(obstacles)
+                G = RRT_star(startpos, endpos, obstacles, n_iter, radius, stepSize)
+
+                # If path available
+                if G.success:
+                    path = dijkstra(G)
+                    print("Path is: ", path)
+                    plot(G, obstacles, radius, path)
+                else:
+                    print("No path available")
+                
+                # drive robot
+                for drive in path:
+                    operate.take_pic()
+                    drive_meas = operate.control()
+                    operate.update_slam(drive_meas)
+                    operate.record_data()
+                    operate.save_image()
+                    operate.detect_target()
+                    
+                    robot_pose = operate.get_robot_pose() # need to fix so it is right
+                    print("Robot pose is: ", robot_pose)
+                    waypoint = drive # setting each waypoint in the path
+                    robot_pose = operate.drive_to_point(waypoint,robot_pose)
+                    operate.pibot.set_velocity([0, 0])
+
+                #Stop for 2 seconds
+                print("Arrived at target")
+                time.sleep(2)
+                
+                # move startpos to endpos now
+                startpos = endpos
 
