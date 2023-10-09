@@ -192,13 +192,13 @@ def drive_to_point(waypoint, robot_pose):
 
     x_waypoint = waypoint[0]
     y_waypoint = waypoint[1]
-    #theta_waypoint = waypoint[2]
+    theta_waypoint = angle_orientation
 
     x_diff = np.mod(x_robot_pose, x_waypoint)
     y_diff = np.mod(y_robot_pose, y_waypoint)
 
-    #TODO Add thresholding ???
-    
+    #TODO Add thresholding/correction step ???
+
     #theta_diff = np.mod(theta_robot_pose, theta_waypoint)
 
     # threshold = 0.05
@@ -314,7 +314,7 @@ if __name__ == "__main__":
     obstacles = np.concatenate((fruits_true_pos, aruco_true_pos))  # merging list of obstacles together (Aruco markers and Fruits)
 
     
-    # Change these values as needed
+    #TODO Test and change these values as needed
     n_iter = 300
     radius = 0.14
     stepSize = 0.5
@@ -322,6 +322,8 @@ if __name__ == "__main__":
     for target in coords_order: #loop for every shopping list target
 
         #print(target)
+        # TODO: Change endpos +- depending on which quadrant target is in
+
         endpos = (target[0]+0.2, target[1]+0.2)# need to add so it is not targeting exactly on fruit?
         #print(endpos)
 

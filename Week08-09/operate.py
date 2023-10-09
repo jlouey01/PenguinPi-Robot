@@ -25,7 +25,7 @@ from YOLO.detector import Detector
 
 
 class Operate:
-    def __init__(self, args, tr, ttr):
+    def __init__(self, args):
         self.folder = 'pibot_dataset/'
         if not os.path.exists(self.folder):
             os.makedirs(self.folder)
@@ -78,8 +78,6 @@ class Operate:
             self.detector = Detector(args.yolo_model)
             self.yolo_vis = np.ones((240, 320, 3)) * 100
         self.bg = pygame.image.load('pics/gui_mask.jpg')
-        self.tr = tr
-        self.ttr = ttr
 
     # wheel control
     def control(self):
@@ -87,7 +85,7 @@ class Operate:
             lv, rv = self.pibot.set_velocity()
         else:
             lv, rv = self.pibot.set_velocity(
-                self.command['motion'], tick=self.tr, turning_tick=self.ttr, time=0)
+                self.command['motion'])
         if self.data is not None:
             self.data.write_keyboard(lv, rv)
         dt = time.time() - self.control_clock
@@ -123,6 +121,11 @@ class Operate:
             self.ekf.predict(drive_meas)
             self.ekf.add_landmarks(lms)
             self.ekf.update(lms)
+    
+    def add_markers(self, position):
+        self.ekf.map_true_markers(position)
+        #self.ekf_on = True
+        #print(self.ekf_on)
 
     # using computer vision to detect targets
     def detect_target(self):
@@ -310,13 +313,30 @@ class Operate:
         if self.quit:
             pygame.quit()
             sys.exit()
+    
+    def run_slam(self):
+        n_observed_markers = len(self.ekf.taglist)
+        if n_observed_markers == 0:
+            if not self.ekf_on:
+                self.notification = 'SLAM is running'
+                self.ekf_on = True
+            else:
+                self.notification = '> 2 landmarks is required for pausing'
+        elif n_observed_markers < 3:
+            self.notification = '> 2 landmarks is required for pausing'
+        else:
+            if not self.ekf_on:
+                self.request_recover_robot = True
+            self.ekf_on = not self.ekf_on
+            if self.ekf_on:
+                self.notification = 'SLAM is running'
+            else:
+                self.notification = 'SLAM is paused'
 
 
 if __name__ == "__main__":
     import argparse
 
-    tr = int(input("enter the tick value: "))
-    ttr = int(input("enter the turning tick value: ")) 
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--ip", metavar='', type=str, default='192.168.50.1')
@@ -358,7 +378,7 @@ if __name__ == "__main__":
             pygame.display.update()
             counter += 2
 
-    operate = Operate(args, tr, ttr)
+    operate = Operate(args)
 
     while start:
         operate.update_keyboard()
