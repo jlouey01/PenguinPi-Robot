@@ -39,6 +39,18 @@ from auto_fruit_search_lvl2_slam import *
 
 
 def run_operate(operate, args):
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--map", type=str, default='party_room.txt') # change to 'M4_true_map_part.txt' for lv2&3
+    parser.add_argument('--slam-est', type=str, default='lab_output/slam.txt') # change
+    parser.add_argument('--target-est', type=str, default='lab_output/targets.txt') # change
+    parser.add_argument("--ip", metavar='', type=str, default='192.168.50.1')
+    parser.add_argument("--port", metavar='', type=int, default=8080)
+    parser.add_argument("--calib_dir", type=str, default="calibration/param/")
+    parser.add_argument("--save_data", action='store_true')
+    parser.add_argument("--play_data", action='store_true')
+    parser.add_argument("--yolo_model", default='YOLO/model/yolov8_model_2.pt')
+    args, _ = parser.parse_known_args()
+    
     while start:
         operate.update_keyboard()
         operate.take_pic()
@@ -50,6 +62,7 @@ def run_operate(operate, args):
         # visualise
         operate.draw(canvas)
         pygame.display.update()
+        print(operate.get_robot_pose())
  
 def run_fruit_search(operate, args, pibot):
     pibot = PenguinPi(args.ip,args.port)
@@ -159,6 +172,23 @@ if __name__ == "__main__":
     ekf = EKF(robot)
     aruco_det = aruco.aruco_detector(robot, marker_length = 0.06)
 
+    pygame.font.init()
+    TITLE_FONT = pygame.font.Font('pics/8-BitMadness.ttf', 35)
+    TEXT_FONT = pygame.font.Font('pics/8-BitMadness.ttf', 40)
+
+    width, height = 700, 660
+    canvas = pygame.display.set_mode((width, height))
+    pygame.display.set_caption('ECE4078 2023 Lab')
+    pygame.display.set_icon(pygame.image.load('pics/8bit/pibot5.png'))
+    canvas.fill((0, 0, 0))
+    splash = pygame.image.load('pics/loading.png')
+    pibot_animate = [pygame.image.load('pics/8bit/pibot1.png'),
+                     pygame.image.load('pics/8bit/pibot2.png'),
+                     pygame.image.load('pics/8bit/pibot3.png'),
+                     pygame.image.load('pics/8bit/pibot4.png'),
+                     pygame.image.load('pics/8bit/pibot5.png')]
+    pygame.display.update()
+
 
     #Move this section into main of auto_fruit_search
     #merge_aruco_fruit(args.slam, args.target)
@@ -176,8 +206,7 @@ if __name__ == "__main__":
     obstacles = np.concatenate((fruits_true_pos, aruco_true_pos))  # merging list of obstacles together (Aruco markers and Fruits)
 
     
-    operate.draw(canvas)
-    pygame.display.update()
+    # Change these values as needed
  
     # creating threads
     t1 = threading.Thread(target=run_operate, args = (operate,args, ), name='operate_slam')

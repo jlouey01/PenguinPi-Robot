@@ -94,6 +94,19 @@ def print_target_fruits_pos(search_list, fruit_list, fruit_true_pos):
                                                   np.round(fruit_true_pos[i][1], 1)))
         n_fruit += 1
 
+def target_fruits_pos_order(search_list, fruit_list, fruit_true_pos):
+    coords_order = []
+    for fruit in search_list:
+        for i in range(len(fruit_list)): # there are 5 targets amongst 10 objects
+            if fruit == fruit_list[i]:
+                x = np.round(fruit_true_pos[i][0], 1)
+                y = np.round(fruit_true_pos[i][1], 1)
+                coords = (x,y)
+                coords_order.append(coords)
+    return coords_order
+
+
+
 
 # Waypoint navigation
 # the robot automatically drives to a given [x,y] coordinate
@@ -132,7 +145,8 @@ def drive_to_point(waypoint, robot_pose):
     linear_vel = wheel_vel*scale
     angular_vel = linear_vel*2 / baseline
     turn_time = abs(turning_angle) / angular_vel
-
+    turn_time = float(turn_time)
+    print("turn time is", turn_time)
     print("Turning for {:.2f} seconds".format(turn_time))
     if turning_angle > 0:
         ppi.set_velocity([0, 1], turning_tick=wheel_vel, time=turn_time)
@@ -148,33 +162,52 @@ def drive_to_point(waypoint, robot_pose):
 
     print("Arrived at [{}, {}]".format(waypoint[0], waypoint[1]))
 
-def get_robot_pose(clock):
-    ####################################################
-    # TODO: replace with your codes to estimate the pose of the robot
-    # We STRONGLY RECOMMEND you to use your SLAM code from M2 here
+    robot_pose = [waypoint[0], waypoint[1], angle_orientation]
 
-    aruco_det = aruco.aruco_detector(
-        ekf.robot, marker_length=0.07)
+    return robot_pose
 
-    dt = time.time() - clock
+# def get_robot_pose(drive_meas):
+#     ####################################################
+#     # TODO: replace with your codes to estimate the pose of the robot
+#     # We STRONGLY RECOMMEND you to use your SLAM code from M2 here
+
+#     # aruco_det = aruco.aruco_detector(
+#     #     ekf.robot, marker_length=0.07)
+
+#     # dt = time.time() - clock
     
-    drive_meas = measure.Drive(wheel_vel, -wheel_vel, dt)
-    clock = time.time()
+#     # drive_meas = measure.Drive(wheel_vel, -wheel_vel, dt)
+#     # clock = time.time()
 
-    ekf.predict(drive_meas)
+#     # lms, _ = aruco_det.detect_marker_positions(ppi.get_image())
+#     # ekf.predict(drive_meas)
+#     # ekf.add_landmarks(lms)
+#     # ekf.update(lms)
+#     # #state = ekf.get_state_vector()
+#     # #x, y, theta = state
+#     # # update the robot pose [x,y,theta]
+#     # #robot_pose = [x, y, theta] # replace with your calculation
+#     # ####################################################
+#     # state = ekf.get_state_vector()
+#     # x, y, theta = state[0], state[1], state[2]
+#     # robot_pose = [x, y, theta]
+#     # #print(robot_pose)
+#     # return robot_pose, clock
+#     img = ppi.get_image()
 
-    lms, _ = aruco_det.detect_marker_positions(ppi.get_image())
-    ekf.update(lms)
-    #state = ekf.get_state_vector()
-    #x, y, theta = state
-    # update the robot pose [x,y,theta]
-    #robot_pose = [x, y, theta] # replace with your calculation
-    ####################################################
-    state = ekf.get_state_vector()
-    x, y, theta = state[0], state[1], state[2]
-    robot_pose = [x, y, theta]
-    #print(robot_pose)
-    return robot_pose, clock
+#     landmarks, _ = aruco_det.detect_marker_positions(img)
+#     ekf.predict(drive_meas)
+#     ekf.update(landmarks)
+
+#     full_circle = 2*np.pi
+#     robot_pose = ekf.robot.state
+
+#     if robot_pose[2][0] < 0:
+#         robot_pose[2][0] = robot_pose[2][0] + full_circle
+#     elif robot_pose[2][0] > full_circle:
+#         robot_pose[2][0] = robot_pose[2][0] - full_circle
+
+#     return robot_pose
 
 # main loop
 if __name__ == "__main__":
@@ -187,9 +220,9 @@ if __name__ == "__main__":
     ppi = PenguinPi(args.ip,args.port)
 
     # read in the true map
-    fruits_list, fruits_true_pos, aruco_true_pos = read_true_map(args.map)
-    search_list = read_search_list()
-    print_target_fruits_pos(search_list, fruits_list, fruits_true_pos)
+    #fruits_list, fruits_true_pos, aruco_true_pos = read_true_map(args.map)
+    #search_list = read_search_list()
+    #print_target_fruits_pos(search_list, fruits_list, fruits_true_pos)
 
     waypoint = [0.0,0.0]
     robot_pose = [0.0,0.0,0.0]
@@ -209,6 +242,15 @@ if __name__ == "__main__":
 
     robot = Robot(baseline, scale, camera_matrix, dist_coeffs)
     ekf = EKF(robot)
+    aruco_det = aruco.aruco_detector(robot, marker_length = 0.06)
+
+
+    #Move this section into main of auto_fruit_search
+    fruits_list, fruits_true_pos, aruco_true_pos = read_true_map(args.map)
+    search_list = read_search_list()
+    print_target_fruits_pos(search_list, fruits_list, fruits_true_pos)
+    coords_order = target_fruits_pos_order(search_list, fruits_list, fruits_true_pos) # order of coords to go to for each fruit
+
 
     # The following is only a skeleton code for semi-auto navigation
     while True:
@@ -230,12 +272,13 @@ if __name__ == "__main__":
             continue
 
         # estimate the robot's pose
-        robot_pose, clock = 
+        #get_robot_pose(drive_meas)
+        print(robot_pose)
         
 
         # robot drives to the waypoint
         waypoint = [x,y]
-        drive_to_point(waypoint,robot_pose)
+        robot_pose = drive_to_point(waypoint,robot_pose)
         print("Finished driving to waypoint: {}; New robot pose: {}".format(waypoint,robot_pose))
 
         # exit

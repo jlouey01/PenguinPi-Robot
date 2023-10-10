@@ -13,7 +13,7 @@ from matplotlib import collections  as mc
 from collections import deque
 
 
-from operate_m4 import *
+#from operate import *
 
 # import SLAM components
 sys.path.insert(0, "{}/slam".format(os.getcwd()))
@@ -26,29 +26,6 @@ sys.path.insert(0, "util")
 from pibot import PenguinPi
 import measure as measure
 
-
-### New Merge SLAM and TARGET txt
-def merge_aruco_fruit(slamtxt, targettxt):
-    with open(slamtxt, "r") as file1:
-        usr_dict = json.load(file1)
-
-    aruco_dict = {}
-    for (i, tag) in enumerate(usr_dict['taglist']):
-        aruco_dict[tag] = np.reshape([usr_dict['map'][0][i], usr_dict['map'][1][i]], (2, 1))
-
-    formatted_dict = {}
-    for tag, values in aruco_dict.items():
-        key = f"aruco{tag}_0"
-        formatted_dict[key] = {"y": values[1][0], "x": values[0][0]}
-
-    with open(targettxt, "r") as file2:
-        data2 = json.load(file2)
-
-    full_data = {**formatted_dict, **data2}
-    with open("Full_Map.txt", "w") as output_file:
-        json.dump(full_data, output_file, indent=4)
-
-#############################################
 
 def read_true_map(fname):
     """Read the ground truth map and output the pose of the ArUco markers and 5 target fruits&vegs to search for
@@ -132,14 +109,6 @@ def target_fruits_pos_order(search_list, fruit_list, fruit_true_pos):
                 coords = (x,y)
                 coords_order.append(coords)
     return coords_order
-
-
-'''
-MIT License
-Copyright (c) 2019 Fanjin Zeng
-This work is licensed under the terms of the MIT license, see <https://opensource.org/licenses/MIT>.  
-'''
-
 
 class Line():
     def __init__(self, p0, p1):
@@ -422,7 +391,6 @@ def pathSearch(startpos, endpos, obstacles, n_iter, radius, stepSize):
         # plot(G, obstacles, radius, path)
         return path
 
-##########################################################################
 
 # Waypoint navigation
 # the robot automatically drives to a given [x,y] coordinate
@@ -465,60 +433,76 @@ def drive_to_point(waypoint, robot_pose):
     print("turn time is", turn_time)
     print("Turning for {:.2f} seconds".format(turn_time))
     if turning_angle > 0:
-        lv, rv = pibot.set_velocity([0, 1], turning_tick=wheel_vel, time=turn_time)
-        # drive_meas = measure.Drive(lv, -rv, turn_time)
-        # operate.take_pic()
-        # lms, _ = aruco_det.detect_marker_positions(operate.img)
-        # operate.update_slam(drive_meas)
-        # operate.detect_target()
+        ppi.set_velocity([0, 1], turning_tick=wheel_vel, time=turn_time)
     else:
-        lv, rv = pibot.set_velocity([0, -1], turning_tick=wheel_vel, time=turn_time)
-        # drive_meas = measure.Drive(lv, -rv, turn_time)
-        # operate.take_pic()
-        # operate.update_slam(drive_meas)
-        # operate.detect_target()
+        ppi.set_velocity([0, -1], turning_tick=wheel_vel, time=turn_time)
         
     # after turning, drive straight to the waypoint
     dist_to_point = np.sqrt((waypoint[0]-robot_pose[0])**2+(waypoint[1]-robot_pose[1])**2)
     drive_time = dist_to_point/(scale*wheel_vel) 
     drive_time = float(drive_time)
     print("Driving for {:.2f} seconds".format(drive_time))
-    lv, rv = pibot.set_velocity([1, 0], tick=wheel_vel, time=drive_time)
-    drive_meas = measure.Drive(lv, -rv, drive_time)
-    operate.take_pic()
-    operate.update_slam(drive_meas)
-    operate.detect_target()
+    ppi.set_velocity([1, 0], tick=wheel_vel, time=drive_time)
 
     print("Arrived at [{}, {}]".format(waypoint[0], waypoint[1]))
 
+    robot_pose = [waypoint[0], waypoint[1], angle_orientation]
 
+    return robot_pose
 
-def get_robot_pose():
+def get_robot_pose(drive_meas):
     ####################################################
     # TODO: replace with your codes to estimate the pose of the robot
     # We STRONGLY RECOMMEND you to use your SLAM code from M2 here
 
-    robot_pose = operate.ekf.robot.state
+    # aruco_det = aruco.aruco_detector(
+    #     ekf.robot, marker_length=0.07)
+
+    # dt = time.time() - clock
+    
+    # drive_meas = measure.Drive(wheel_vel, -wheel_vel, dt)
+    # clock = time.time()
+
+    # lms, _ = aruco_det.detect_marker_positions(ppi.get_image())
+    # ekf.predict(drive_meas)
+    # ekf.add_landmarks(lms)
+    # ekf.update(lms)
+    # #state = ekf.get_state_vector()
+    # #x, y, theta = state
+    # # update the robot pose [x,y,theta]
+    # #robot_pose = [x, y, theta] # replace with your calculation
+    # ####################################################
+    # state = ekf.get_state_vector()
+    # x, y, theta = state[0], state[1], state[2]
+    # robot_pose = [x, y, theta]
+    # #print(robot_pose)
+    # return robot_pose, clock
+    img = ppi.get_image()
+
+    landmarks, _ = aruco_det.detect_marker_positions(img)
+    ekf.predict(drive_meas)
+    ekf.update(landmarks)
+
+    full_circle = 2*np.pi
+    robot_pose = ekf.robot.state
+
+    if robot_pose[2][0] < 0:
+        robot_pose[2][0] = robot_pose[2][0] + full_circle
+    elif robot_pose[2][0] > full_circle:
+        robot_pose[2][0] = robot_pose[2][0] - full_circle
 
     return robot_pose
 
 # main loop
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("Fruit searching")
-    parser.add_argument("--map", type=str, default='Full_Map.txt') # change to 'M4_true_map_part.txt' for lv2&3
-    parser.add_argument('--slam', type=str, default='lab_output/slam.txt') # change
-    parser.add_argument('--target', type=str, default='lab_output/targets.txt') # change
+    parser.add_argument("--map", type=str, default='M4_true_map_full.txt') # change to 'M4_true_map_part.txt' for lv2&3
     parser.add_argument("--ip", metavar='', type=str, default='192.168.50.1')
     parser.add_argument("--port", metavar='', type=int, default=8080)
-    parser.add_argument("--calib_dir", type=str, default="calibration/param/")
-    parser.add_argument("--save_data", action='store_true')
-    parser.add_argument("--play_data", action='store_true')
-    parser.add_argument("--yolo_model", default='YOLO/model/yolov8_model_2.pt')
     args, _ = parser.parse_known_args()
 
-    pibot = PenguinPi(args.ip,args.port)
-    operate = Operate(args) # add args
-    
+    ppi = PenguinPi(args.ip,args.port)
+
     # read in the true map
     #fruits_list, fruits_true_pos, aruco_true_pos = read_true_map(args.map)
     #search_list = read_search_list()
@@ -545,47 +529,20 @@ if __name__ == "__main__":
     aruco_det = aruco.aruco_detector(robot, marker_length = 0.06)
 
 
-
     #Move this section into main of auto_fruit_search
-    merge_aruco_fruit(args.slam, args.target)
     fruits_list, fruits_true_pos, aruco_true_pos = read_true_map(args.map)
     search_list = read_search_list()
     print_target_fruits_pos(search_list, fruits_list, fruits_true_pos)
     coords_order = target_fruits_pos_order(search_list, fruits_list, fruits_true_pos) # order of coords to go to for each fruit
-
-    operate.add_markers(aruco_true_pos)
-    operate.run_slam() # initializes slam
-    #print("SLAM is on???", operate.ekf_on)
-
-    n_observed_markers = len(operate.ekf.taglist)
-
-    if n_observed_markers == 0:
-        if not operate.ekf_on:
-            print('SLAM is running')
-            operate.ekf_on = True
-        else:
-            print('> 2 landmarks is required for pausing')
-    elif n_observed_markers < 3:
-        print('> 2 landmarks is required for pausing')
-    else:
-        if not operate.ekf_on:
-            operate.request_recover_robot = True
-        operate.ekf_on = not operate.ekf_on
-        if operate.ekf_on:
-            print('SLAM is running')
-        else:
-            print('SLAM is paused')
-
-
 
     startpos = (0., 0.)
     obstacles = np.concatenate((fruits_true_pos, aruco_true_pos))  # merging list of obstacles together (Aruco markers and Fruits)
 
     
     # Change these values as needed
-    n_iter = 300
+    n_iter = 100
     radius = 0.14
-    stepSize = 0.2
+    stepSize = 0.6
 
     for target in coords_order: #loop for every shopping list target
 
@@ -606,16 +563,11 @@ if __name__ == "__main__":
             print("No path available")
         
         # drive robot
-        for drive in path[2:]:
-            robot_pose = get_robot_pose() 
-            print("Robot pose: ", robot_pose)
+        for drive in path:
+            #robot_pose, clock = get_robot_pose(clock) # need to fix so it is right
             waypoint = drive # setting each waypoint in the path
-            drive_to_point(waypoint,robot_pose)
-            lv, rv = pibot.set_velocity([0, 0])
-            drive_meas = measure.Drive(lv, -rv, 0)
-            operate.take_pic()
-            operate.update_slam(drive_meas)
-            operate.detect_target()
+            robot_pose = drive_to_point(waypoint,robot_pose)
+            ppi.set_velocity([0, 0])
 
         #Stop for 2 seconds
         print("Arrived at target")

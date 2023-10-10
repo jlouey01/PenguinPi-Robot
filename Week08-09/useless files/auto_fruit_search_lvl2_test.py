@@ -446,34 +446,48 @@ def drive_to_point(waypoint, robot_pose):
 
     print("Arrived at [{}, {}]".format(waypoint[0], waypoint[1]))
 
-
-def get_robot_pose(clock):
+def get_robot_pose(drive_meas):
     ####################################################
     # TODO: replace with your codes to estimate the pose of the robot
     # We STRONGLY RECOMMEND you to use your SLAM code from M2 here
 
-    aruco_det = aruco.aruco_detector(
-        ekf.robot, marker_length=0.07)
+    # aruco_det = aruco.aruco_detector(
+    #     ekf.robot, marker_length=0.07)
 
-    dt = time.time() - clock
+    # dt = time.time() - clock
     
-    drive_meas = measure.Drive(wheel_vel, -wheel_vel, dt)
-    clock = time.time()
+    # drive_meas = measure.Drive(wheel_vel, -wheel_vel, dt)
+    # clock = time.time()
 
-    lms, _ = aruco_det.detect_marker_positions(ppi.get_image())
+    # lms, _ = aruco_det.detect_marker_positions(ppi.get_image())
+    # ekf.predict(drive_meas)
+    # ekf.add_landmarks(lms)
+    # ekf.update(lms)
+    # #state = ekf.get_state_vector()
+    # #x, y, theta = state
+    # # update the robot pose [x,y,theta]
+    # #robot_pose = [x, y, theta] # replace with your calculation
+    # ####################################################
+    # state = ekf.get_state_vector()
+    # x, y, theta = state[0], state[1], state[2]
+    # robot_pose = [x, y, theta]
+    # #print(robot_pose)
+    # return robot_pose, clock
+    img = ppi.get_image()
+
+    landmarks, _ = aruco_det.detect_marker_positions(img)
     ekf.predict(drive_meas)
-    ekf.add_landmarks(lms)
-    ekf.update(lms)
-    #state = ekf.get_state_vector()
-    #x, y, theta = state
-    # update the robot pose [x,y,theta]
-    #robot_pose = [x, y, theta] # replace with your calculation
-    ####################################################
-    state = ekf.get_state_vector()
-    x, y, theta = state[0], state[1], state[2]
-    robot_pose = [x, y, theta]
-    #print(robot_pose)
-    return robot_pose, clock
+    ekf.update(landmarks)
+
+    full_circle = 2*np.pi
+    robot_pose = ekf.robot.state
+
+    if robot_pose[2][0] < 0:
+        robot_pose[2][0] = robot_pose[2][0] + full_circle
+    elif robot_pose[2][0] > full_circle:
+        robot_pose[2][0] = robot_pose[2][0] - full_circle
+
+    return robot_pose
 
 # main loop
 if __name__ == "__main__":
@@ -508,6 +522,8 @@ if __name__ == "__main__":
 
     robot = Robot(baseline, scale, camera_matrix, dist_coeffs)
     ekf = EKF(robot)
+    aruco_det = aruco.aruco_detector(robot, marker_length = 0.06)
+
 
     #Move this section into main of auto_fruit_search
     fruits_list, fruits_true_pos, aruco_true_pos = read_true_map(args.map)
@@ -516,13 +532,13 @@ if __name__ == "__main__":
     coords_order = target_fruits_pos_order(search_list, fruits_list, fruits_true_pos) # order of coords to go to for each fruit
 
     startpos = (0., 0.)
-    obstacles = fruits_true_pos + aruco_true_pos # merging list of obstacles together (Aruco markers and Fruits)
+    obstacles = np.concatenate((fruits_true_pos, aruco_true_pos))  # merging list of obstacles together (Aruco markers and Fruits)
 
     
     # Change these values as needed
-    n_iter = 50
+    n_iter = 100
     radius = 0.1
-    stepSize = 0.5
+    stepSize = 0.6
 
     for target in coords_order: #loop for every shopping list target
 
@@ -531,7 +547,7 @@ if __name__ == "__main__":
         #print(endpos)
 
         ## RRT star
-        #print(obstacles)
+        print(obstacles)
         G = RRT_star(startpos, endpos, obstacles, n_iter, radius, stepSize)
 
         # If path available
@@ -544,7 +560,10 @@ if __name__ == "__main__":
         
         # drive robot
         for drive in path:
-            robot_pose, clock = get_robot_pose(clock) # need to fix so it is right
+            lv, rv = ppi.set_velocity([0, 1], turning_tick=wheel_vel, time=0.1)
+            ppi.set_velocity([0, 0], turning_tick=wheel_vel, time=0.5)
+            drive_meas = measure.Drive(lv,rv,turn_time=0.01)
+            robot_pose = get_robot_pose(drive_meas) # need to fix so it is right
             waypoint = drive # setting each waypoint in the path
             drive_to_point(waypoint,robot_pose)
             ppi.set_velocity([0, 0])
