@@ -546,7 +546,7 @@ if __name__ == "__main__":
         for drive in path:
             robot_pose, clock = get_robot_pose(clock) # need to fix so it is right
             waypoint = drive # setting each waypoint in the path
-            drive_to_point(waypoint,robot_pose)
+            drive_to_point(waypoint, robot_pose)
             ppi.set_velocity([0, 0])
 
         #Stop for 2 seconds

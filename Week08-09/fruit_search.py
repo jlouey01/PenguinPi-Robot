@@ -150,6 +150,7 @@ def drive_to_point(waypoint, robot_pose):
 
     angle_orientation = np.arctan2(ypos, xpos)
     turning_angle = angle_orientation - robot_pose[2]
+    print("+++++++++++++++++++++++++++++++++++++",turning_angle)
 
     # turn towards the waypoint
     turning_angle = (turning_angle + np.pi) % (2 * np.pi) - np.pi
@@ -181,7 +182,7 @@ def drive_to_point(waypoint, robot_pose):
     print("Driving for {:.2f} seconds".format(drive_time))
     #lv, rv = ppi.set_velocity([1, 0], tick=wheel_vel, time=drive_time)
     drive_update_slam([1,0],wheel_vel,drive_time)
-    print("Arrived at [{}, {}]".format(waypoint[0], waypoint[1]))
+
 
     # Correction step
     robot_pose = get_robot_pose()
@@ -192,7 +193,10 @@ def drive_to_point(waypoint, robot_pose):
 
     x_waypoint = waypoint[0]
     y_waypoint = waypoint[1]
-    theta_waypoint = angle_orientation
+    theta_waypoint = angle_orientation[0]
+
+    print("SLAMS thinks we arrived at [{}, {}, {}]".format(robot_pose[0], robot_pose[1], robot_pose[2]))
+    print("Waypoint was at [{}, {}, {}] \n \n".format(x_waypoint, y_waypoint, theta_waypoint))
 
     x_diff = np.mod(x_robot_pose, x_waypoint)
     y_diff = np.mod(y_robot_pose, y_waypoint)
@@ -251,7 +255,7 @@ if __name__ == "__main__":
 
 
     #TODO: Read in merge_estimations to generate targets.txt
-
+    print('1')
     # read in the true map
     merge_aruco_fruit(args.slam, args.target)
     fruits_list, fruits_true_pos, aruco_true_pos = read_true_map(args.map)
@@ -259,6 +263,7 @@ if __name__ == "__main__":
     print_target_fruits_pos(search_list, fruits_list, fruits_true_pos)
     coords_order = target_fruits_pos_order(search_list, fruits_list, fruits_true_pos) # order of coords to go to for each fruit
 
+    print('2')
     waypoint = [0.0,0.0]
     robot_pose = [0.0,0.0,0.0]
 
@@ -316,32 +321,47 @@ if __name__ == "__main__":
     
     #TODO Test and change these values as needed
     n_iter = 300
-    radius = 0.14
+    radius = 0.18
     stepSize = 0.5
 
     for target in coords_order: #loop for every shopping list target
 
-        #print(target)
-        # TODO: Change endpos +- depending on which quadrant target is in
 
-        endpos = (target[0]+0.2, target[1]+0.2)# need to add so it is not targeting exactly on fruit?
-        #print(endpos)
+        # DONE: Change endpos +- depending on which quadrant target is in
+        if target[0]>0:
+            newx = target[0] - 0.2
+        else:
+            newx = target[0] + 0.2
+
+        if target[1] > 0:
+            newy = target[1] - 0.2
+        else:
+            newy = target[1] + 0.2
+
+        endpos = (newx, newy)
+        print('endpos: ', endpos)
+        print('startpos: ', startpos)
 
         ## RRT star
-        print(obstacles)
+        #print(obstacles)
         G = RRT_star(startpos, endpos, obstacles, n_iter, radius, stepSize)
 
-        # If path available
-        if G.success:
-            path = dijkstra(G)
-            print(path)
+        # DONE: increase n_iter with num of failures
+        # If path available # DONE: regenerate paths until success; ,maybe implement go to 0,0 if unsuccessful after 20 iterations
+        iter_fail = 1
+        while not G.success:
+            print('startpos: ', startpos, 'endpos: ', endpos, 'obstacles: ', obstacles, 'n_iter: ', n_iter, 'radius: ',
+                  radius, 'stepSize:', stepSize)
+            G = RRT_star(startpos, endpos, obstacles, 100*iter_fail + n_iter, radius, stepSize)
             plot(G, obstacles, radius, path)
-        else:
-            print("No path available")
+            iter_fail += 1
+
+        path = dijkstra(G)
+        plot(G, obstacles, radius, path)
         
         # drive robot
         for drive in path[2:]:
-            robot_pose = get_robot_pose() 
+            robot_pose = get_robot_pose() # TODO: not updating correctly?
             print("Robot pose: ", robot_pose)
             waypoint = drive # setting each waypoint in the path
             drive_to_point(waypoint,robot_pose)

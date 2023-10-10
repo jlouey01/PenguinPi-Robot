@@ -81,9 +81,16 @@ def nearest(G, vex, obstacles, radius):
 def newVertex(randvex, nearvex, stepSize):
     dirn = np.array(randvex) - np.array(nearvex)
     length = np.linalg.norm(dirn)
-    dirn = (dirn / length) * min (stepSize, length)
+    dirn = (dirn / length) * min(stepSize, length)
 
-    newvex = (nearvex[0]+dirn[0], nearvex[1]+dirn[1])
+    newvex_x = nearvex[0] + dirn[0]
+    newvex_y = nearvex[1] + dirn[1]
+
+    # Clip to ensure it's within the range # DONE
+    newvex_x = max(-1.3, min(1.3, newvex_x))
+    newvex_y = max(-1.3, min(1.3, newvex_y))
+
+    newvex = (newvex_x, newvex_y)
     return newvex
 
 
@@ -134,13 +141,12 @@ class Graph:
         self.neighbors[idx1].append((idx2, cost))
         self.neighbors[idx2].append((idx1, cost))
 
-
     def randomPosition(self):
         rx = random()
         ry = random()
 
-        posx = self.startpos[0] - (self.sx / 2.) + rx * self.sx * 2
-        posy = self.startpos[1] - (self.sy / 2.) + ry * self.sy * 2
+        posx = max(-1.3, min(1.3, self.startpos[0] - (self.sx / 2.) + rx * self.sx * 2)) # DONE
+        posy = max(-1.3, min(1.3, self.startpos[1] - (self.sy / 2.) + ry * self.sy * 2))
         return posx, posy
 
 
@@ -174,6 +180,8 @@ def RRT(startpos, endpos, obstacles, n_iter, radius, stepSize):
 
 def RRT_star(startpos, endpos, obstacles, n_iter, radius, stepSize):
     G = Graph(startpos, endpos)
+
+    print('foo')
 
     for _ in range(n_iter):
         randvex = G.randomPosition()

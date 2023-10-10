@@ -796,7 +796,6 @@ if __name__ == "__main__":
                      pygame.image.load('pics/8bit/pibot5.png')]
     pygame.display.update()
 
-
     start = False
 
     counter = 40
@@ -838,9 +837,12 @@ if __name__ == "__main__":
             operate.record_data()
             operate.save_image()
             operate.detect_target()
+            # visualise
+            operate.draw(canvas)
+            pygame.display.update()
             # estimate the robot's pose
             robot_pose = operate.get_robot_pose()
-            #print("robot pose is: ", robot_pose)
+            print("robot pose is: ", robot_pose)
 
             #Move this section into main of auto_fruit_search
             fruits_list, fruits_true_pos, aruco_true_pos = operate.read_true_map(args.map)
@@ -859,9 +861,9 @@ if __name__ == "__main__":
 
             for target in coords_order: #loop for every shopping list target
 
-                #print(target)
+                # print(target)
                 endpos = (target[0]+0.2, target[1]+0.2)# need to add so it is not targeting exactly on fruit?
-                #print(endpos)
+                # print(endpos)
 
                 ## RRT star
                 #print(obstacles)
@@ -883,6 +885,9 @@ if __name__ == "__main__":
                     operate.record_data()
                     operate.save_image()
                     operate.detect_target()
+                    # visualise
+                    operate.draw(canvas)
+                    pygame.display.update()
                     
                     robot_pose = operate.get_robot_pose() # need to fix so it is right
                     print("Robot pose is: ", robot_pose)

@@ -170,7 +170,7 @@ def get_robot_pose(clock):
     # update the robot pose [x,y,theta]
     #robot_pose = [x, y, theta] # replace with your calculation
     ####################################################
-    state = ekf.get_state_vector()
+    state = ekf.()
     x, y, theta = state[0], state[1], state[2]
     robot_pose = [x, y, theta]
     #print(robot_pose)
@@ -230,7 +230,8 @@ if __name__ == "__main__":
             continue
 
         # estimate the robot's pose
-        robot_pose, clock = 
+        print(robot.state)
+        robot_pose, clock = robot.state,
         
 
         # robot drives to the waypoint
