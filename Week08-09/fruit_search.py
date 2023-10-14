@@ -267,6 +267,7 @@ if __name__ == "__main__":
     print_target_fruits_pos(search_list, fruits_list, fruits_true_pos)
     coords_order = target_fruits_pos_order(search_list, fruits_list, fruits_true_pos) # order of coords to go to for each fruit
 
+
     print('2')
     waypoint = [0.0,0.0]
     robot_pose = [0.0,0.0,0.0]
@@ -328,7 +329,11 @@ if __name__ == "__main__":
     radius = 0.18
     stepSize = 0.5
 
-    for target in coords_order: #loop for every shopping list target
+
+    num_of_fruits = len(coords_order)
+    fruits_found = 0
+    while fruits_found < num_of_fruits: #loop for every shopping list target
+        target = coords_order[fruits_found]
         need_to_backtrack = False
 
         # DONE: Change endpos +- depending on which quadrant target is in
@@ -366,7 +371,9 @@ if __name__ == "__main__":
         else:
             path = dijkstra(G)
             backtrack_point = path[-2]
+            fruits_found += 1
             plot(G, obstacles, radius, path)
+
         
         # drive robot
         for drive in path[1:]: # TODO: why start at 2 and not 1?
