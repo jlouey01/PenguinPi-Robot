@@ -174,14 +174,12 @@ def RRT(startpos, endpos, obstacles, n_iter, radius, stepSize):
             G.add_edge(newidx, endidx, dist)
             G.success = True
             #print('success')
-            # break
+            # break # TODO: not sure why this is commented out
     return G
 
 
 def RRT_star(startpos, endpos, obstacles, n_iter, radius, stepSize):
     G = Graph(startpos, endpos)
-
-    print('foo')
 
     for _ in range(n_iter):
         randvex = G.randomPosition()
@@ -227,8 +225,8 @@ def RRT_star(startpos, endpos, obstacles, n_iter, radius, stepSize):
                 G.distances[endidx] = G.distances[newidx]+dist
 
             G.success = True
-            #print('success')
-            # break
+            print('success')
+            break # TODO: not sure why this was commented out
     return G
 
 

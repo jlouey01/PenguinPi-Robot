@@ -11,6 +11,8 @@ from rrt import *
 
 from operate import Operate
 
+
+
 # import SLAM components
 sys.path.insert(0, "{}/slam".format(os.getcwd()))
 from slam.ekf import EKF
@@ -29,7 +31,8 @@ def merge_aruco_fruit(slamtxt, targettxt):
 
     aruco_dict = {}
     for (i, tag) in enumerate(usr_dict['taglist']):
-        aruco_dict[tag] = np.reshape([usr_dict['map'][0][i], usr_dict['map'][1][i]], (2, 1))
+        if tag <= 10:
+            aruco_dict[tag] = np.reshape([usr_dict['map'][0][i], usr_dict['map'][1][i]], (2, 1))
 
     formatted_dict = {}
     for tag, values in aruco_dict.items():
@@ -248,10 +251,11 @@ if __name__ == "__main__":
     parser.add_argument("--yolo_model", default='YOLO/model/yolov8_model_2.pt')
     parser.add_argument("--calib_dir", type=str, default="calibration/param/")
 
-
     args, _ = parser.parse_known_args()
 
     ppi = PenguinPi(args.ip,args.port)
+
+    backtrack_point = (0,0)
 
 
     #TODO: Read in merge_estimations to generate targets.txt
@@ -325,7 +329,7 @@ if __name__ == "__main__":
     stepSize = 0.5
 
     for target in coords_order: #loop for every shopping list target
-
+        need_to_backtrack = False
 
         # DONE: Change endpos +- depending on which quadrant target is in
         if target[0]>0:
@@ -346,21 +350,26 @@ if __name__ == "__main__":
         #print(obstacles)
         G = RRT_star(startpos, endpos, obstacles, n_iter, radius, stepSize)
 
-        # DONE: increase n_iter with num of failures
-        # If path available # DONE: regenerate paths until success; ,maybe implement go to 0,0 if unsuccessful after 20 iterations
+        # DONE: increase n_iter linearly with num of failures
+        # TODO: backtrack by 1 step if failed fail_tolerance times
         iter_fail = 1
+        fail_tolerance = 4
         while not G.success:
-            print('startpos: ', startpos, 'endpos: ', endpos, 'obstacles: ', obstacles, 'n_iter: ', n_iter, 'radius: ',
-                  radius, 'stepSize:', stepSize)
-            G = RRT_star(startpos, endpos, obstacles, 100*iter_fail + n_iter, radius, stepSize)
-            plot(G, obstacles, radius, path)
-            iter_fail += 1
+            if iter_fail < fail_tolerance:
+                G = RRT_star(startpos, endpos, obstacles, 100*iter_fail + n_iter, radius, stepSize)
+                iter_fail += 1
+            else:
+                need_to_backtrack = True
 
-        path = dijkstra(G)
-        plot(G, obstacles, radius, path)
+        if need_to_backtrack:
+            path = [startpos,backtrack_point]
+        else:
+            path = dijkstra(G)
+            backtrack_point = path[-2]
+            plot(G, obstacles, radius, path)
         
         # drive robot
-        for drive in path[2:]:
+        for drive in path[1:]: # TODO: why start at 2 and not 1?
             robot_pose = get_robot_pose() # TODO: not updating correctly?
             print("Robot pose: ", robot_pose)
             waypoint = drive # setting each waypoint in the path
