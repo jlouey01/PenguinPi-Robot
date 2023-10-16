@@ -326,7 +326,7 @@ if __name__ == "__main__":
     
     #TODO Test and change these values as needed
     n_iter = 300
-    radius = 0.22
+    radius = 0.22 # anything higher seems like we cannot get a decent path
     stepSize = 0.5
 
 
