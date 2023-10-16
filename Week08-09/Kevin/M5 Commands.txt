@@ -1,0 +1,25 @@
+M5 Commands
+
+Download Zip and move into LIVEDEMO folder
+Open VS Code into Folder
+
+Activate VENV
+PenguinPi/Scripts/Activate
+
+cd into LIVEDEMO Folder
+
+#Getting SLAM and Target Map
+
+python operate.py
+- enter to start SLAM
+- s to save SLAM
+- p to start YOLO
+- n to save predictions
+
+python TargetPoseEst_1.py
+
+fruit_search_autonomous.py
+
+
+Last case scenario:
+python fruit_search_waypoints.py
