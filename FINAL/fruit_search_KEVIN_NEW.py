@@ -326,7 +326,7 @@ if __name__ == "__main__":
     
     #TODO Test and change these values as needed
     n_iter = 300
-    radius = 0.3
+    radius = 0.22
     stepSize = 0.5
 
 
@@ -354,10 +354,10 @@ if __name__ == "__main__":
 
         ## RRT star
         #print(obstacles)
-        print(obstacles)
-        print(n_iter)
-        print(radius)
-        print(stepSize)
+        # print(obstacles)
+        # print(n_iter)
+        # print(radius)
+        # print(stepSize)
 
 
         G = RRT_star(startpos, endpos, obstacles, n_iter, radius, stepSize)
