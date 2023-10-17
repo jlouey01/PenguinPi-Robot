@@ -288,8 +288,12 @@ def plot(G, obstacles, radius, path=None):
         lc2 = mc.LineCollection(paths, colors='blue', linewidths=3)
         ax.add_collection(lc2)
 
-    ax.autoscale()
-    ax.margins(0.1)
+    # ax.autoscale()
+    # ax.margins(0.1)
+    # plt.show()
+    # Set x and y limits
+    ax.set_xlim(-1.5, 1.5)
+    ax.set_ylim(-1.5, 1.5)
     plt.show()
 
 

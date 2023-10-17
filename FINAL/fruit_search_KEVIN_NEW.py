@@ -309,15 +309,6 @@ if __name__ == "__main__":
 
     operate.add_markers(aruco_true_pos)
 
-    ### use one or the other
-
-    #lms=[]
-    # for i,lm in enumerate(aruco_true_pos):
-    #     measure_lm = measure.Marker(np.array([[lm[0]],[lm[1]]]),i+1)
-    #     lms.append(measure_lm)
-    # operate.ekf.add_landmarks(lms) 
-
-
     startpos = (0., 0.)
 
     #TODO Add obstacle around arena
@@ -327,7 +318,7 @@ if __name__ == "__main__":
     
     #TODO Test and change these values as needed
     n_iter = 300
-    radius = 0.14 # anything higher seems like we cannot get a decent path
+    radius = 0.18 # anything higher seems like we cannot get a decent path
     stepSize = 0.5
 
 
@@ -365,16 +356,14 @@ if __name__ == "__main__":
 
         # DONE: increase n_iter linearly with num of failures
         # TODO: backtrack by 1 step if failed fail_tolerance times
-        iter_fail = 1
+        iter_fail = 0
         fail_tolerance = 4
-        print(iter_fail)
+        num_of_paths_to_check = 10
+
         while not G.success:
             if iter_fail < fail_tolerance:
-                new_iter = 100*iter_fail
-                print(new_iter)
-                G = RRT_star(startpos, endpos, obstacles, new_iter + n_iter, radius, stepSize)
+                G = RRT_star(startpos, endpos, obstacles, 100*iter_fail + n_iter, radius, stepSize)
                 iter_fail += 1
-                
             else:
                 need_to_backtrack = True
                 break
@@ -382,7 +371,18 @@ if __name__ == "__main__":
         if need_to_backtrack:
             path = [startpos,backtrack_point]
         else:
-            path = dijkstra(G)
+            minpath = dijkstra(G)
+            min_waypoints = len(minpath)
+            for _ in range(num_of_paths_to_check):
+                G = RRT_star(startpos, endpos, obstacles, 100*iter_fail + n_iter, radius, stepSize)
+                if G.success:
+                    new_path = dijkstra(G)
+                    if len(new_path) < min_waypoints:
+                        minpath = new_path
+                        min_waypoints = len(new_path)
+                print(f"Run:{_+1}, len: {len(new_path)} with iters {100*iter_fail + n_iter} ")
+
+            path = minpath
             backtrack_point = path[-2]
             fruits_found += 1
             plot(G, obstacles, radius, path)

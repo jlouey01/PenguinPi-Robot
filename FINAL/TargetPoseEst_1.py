@@ -56,8 +56,13 @@ def estimate_pose(camera_matrix, obj_info, robot_pose):
     theta = np.arctan(x_shift/focal_length)     # angle of object relative to the robot
     ang = theta + robot_pose[2]     # angle of object in the world frame
     
-   # relative object location
+    # relative object location
     distance_obj = distance/np.cos(theta) # relative distance between robot and object
+
+    # Testing threshold for photos
+    if distance_obj > 1:
+        return None
+
     x_relative = distance_obj * np.cos(theta) # relative x pose
     y_relative = distance_obj * np.sin(theta) # relative y pose
     relative_pose = {'x': x_relative, 'y': y_relative}
