@@ -116,6 +116,7 @@ def print_target_fruits_pos(search_list, fruit_list, fruit_true_pos):
                                                   fruit,
                                                   np.round(fruit_true_pos[i][0], 1),
                                                   np.round(fruit_true_pos[i][1], 1)))
+                break
         n_fruit += 1
 
 def target_fruits_pos_order(search_list, fruit_list, fruit_true_pos):
@@ -127,7 +128,7 @@ def target_fruits_pos_order(search_list, fruit_list, fruit_true_pos):
                 y = np.round(fruit_true_pos[i][1], 1)
                 coords = (x,y)
                 coords_order.append(coords)
-                continue
+                break
     return coords_order
 
 # Waypoint navigation
@@ -326,7 +327,7 @@ if __name__ == "__main__":
     
     #TODO Test and change these values as needed
     n_iter = 300
-    radius = 0.22 # anything higher seems like we cannot get a decent path
+    radius = 0.14 # anything higher seems like we cannot get a decent path
     stepSize = 0.5
 
 
@@ -338,15 +339,15 @@ if __name__ == "__main__":
         need_to_backtrack = False
 
         # DONE: Change endpos +- depending on which quadrant target is in
-        if target[0]>0:
-            newx = target[0] - 0.2
+        if target[0] > 0:
+            newx = target[0] - 0.1
         else:
-            newx = target[0] + 0.2
+            newx = target[0] + 0.1
 
         if target[1] > 0:
-            newy = target[1] - 0.2
+            newy = target[1] - 0.1
         else:
-            newy = target[1] + 0.2
+            newy = target[1] + 0.1
 
         endpos = (newx, newy)
         print('endpos: ', endpos)
@@ -369,7 +370,9 @@ if __name__ == "__main__":
         print(iter_fail)
         while not G.success:
             if iter_fail < fail_tolerance:
-                G = RRT_star(startpos, endpos, obstacles, 100*iter_fail + n_iter, radius, stepSize)
+                new_iter = 100*iter_fail
+                print(new_iter)
+                G = RRT_star(startpos, endpos, obstacles, new_iter + n_iter, radius, stepSize)
                 iter_fail += 1
                 
             else:
