@@ -60,8 +60,8 @@ def estimate_pose(camera_matrix, obj_info, robot_pose):
     distance_obj = distance/np.cos(theta) # relative distance between robot and object
 
     # Testing threshold for photos
-    if distance_obj > 1:
-        return None
+    # if distance_obj > 1:
+    #     return None
 
     x_relative = distance_obj * np.cos(theta) # relative x pose
     y_relative = distance_obj * np.sin(theta) # relative y pose

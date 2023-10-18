@@ -7,6 +7,7 @@ import numpy as np
 import json
 import argparse
 import time
+from copy import deepcopy
 from rrt import *
 
 from operate import Operate
@@ -256,7 +257,7 @@ if __name__ == "__main__":
 
     ppi = PenguinPi(args.ip,args.port)
 
-    backtrack_point = (0,0)
+    backtrack_path = []
 
 
     #TODO: Read in merge_estimations to generate targets.txt
@@ -358,7 +359,7 @@ if __name__ == "__main__":
         # TODO: backtrack by 1 step if failed fail_tolerance times
         iter_fail = 0
         fail_tolerance = 4
-        num_of_paths_to_check = 10
+        num_of_paths_to_check = 3
 
         while not G.success:
             if iter_fail < fail_tolerance:
@@ -369,7 +370,13 @@ if __name__ == "__main__":
                 break
 
         if need_to_backtrack:
-            path = [startpos,backtrack_point]
+            path = [startpos]
+            backtrack_path.reverse()
+            for point in backtrack_path[1:]:
+                G = RRT_star(point, endpos, obstacles, n_iter, radius, stepSize)
+                path.append(point)
+                if G.success:
+                    break
         else:
             minpath = dijkstra(G)
             min_waypoints = len(minpath)
@@ -383,13 +390,13 @@ if __name__ == "__main__":
                 print(f"Run:{_+1}, len: {len(new_path)} with iters {100*iter_fail + n_iter} ")
 
             path = minpath
-            backtrack_point = path[-2]
+            backtrack_path = deepcopy(path)
             fruits_found += 1
             plot(G, obstacles, radius, path)
 
         
         # drive robot
-        for drive in path[1:]: # TODO: why start at 2 and not 1?
+        for drive in path[1:]:
             robot_pose = get_robot_pose() 
             print("Robot pose: ", robot_pose)
             waypoint = drive # setting each waypoint in the path
@@ -400,11 +407,11 @@ if __name__ == "__main__":
             operate.update_slam(drive_meas)
 
         # Check distance from fruit
-        xpos = endpos[0] - robot_pose[0]
-        ypos = endpos[1] - robot_pose[1]
-        dist_to_point = np.sqrt((xpos)**2+(ypos)**2)
+        # xpos = endpos[0] - robot_pose[0]
+        # ypos = endpos[1] - robot_pose[1]
+        # dist_to_point = np.sqrt((xpos)**2+(ypos)**2)
         
-        print("Distance to waypoint is: ", dist_to_point)
+        #print("Distance to waypoint is: ", dist_to_point)
         
         # Check if within 5 cm
         # if dist_to_point > 0.5:
