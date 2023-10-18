@@ -170,14 +170,19 @@ class EKF:
             self.P[-2,-2] = self.init_lm_cov**2
             self.P[-1,-1] = self.init_lm_cov**2
 
-    def map_true_markers(self, aruco_true_pos):
-        for i, marker in enumerate(aruco_true_pos):
+    ## Adding markers already known location 
+    def map_true_markers(self, marker_true_pos):
+        # Pass in markers position from known position of true map
+        for i, marker in enumerate(marker_true_pos):
             self.taglist.append(i+1)
             marker = [[marker[0]], [marker[1]]]
             #print(marker)
+
+            # Add marker position into map (from add_landmarks())
             self.markers = np.concatenate((self.markers, marker), axis=1)
             self.P = np.concatenate((self.P, np.zeros((2, self.P.shape[1]))), axis=0)
             self.P = np.concatenate((self.P, np.zeros((self.P.shape[0], 2))), axis=1)
+            # Setting covariance to 0
             self.P[-2,-2] = 0
             self.P[-1,-1] = 0
 

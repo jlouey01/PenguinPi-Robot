@@ -161,7 +161,7 @@ def drive_to_point(waypoint, robot_pose):
     turning_angle = (turning_angle + np.pi) % (2 * np.pi) - np.pi
     #print("turning angle",turning_angle)
 
-    # may not need
+    # Ensure angle is capped
     if turning_angle > np.pi:
         turning_angle -= 2 * np.pi
     elif turning_angle < -np.pi:
@@ -189,12 +189,8 @@ def drive_to_point(waypoint, robot_pose):
     drive_update_slam([1,0],wheel_vel,drive_time)
 
 
-    # Correction step
+    # Position
     robot_pose = get_robot_pose()
-
-    x_robot_pose = robot_pose[0]
-    y_robot_pose = robot_pose[1]
-    theta_robot_pose = robot_pose[2]
 
     x_waypoint = waypoint[0]
     y_waypoint = waypoint[1]
@@ -203,37 +199,22 @@ def drive_to_point(waypoint, robot_pose):
     print("SLAMS thinks we arrived at [{}, {}, {}]".format(robot_pose[0], robot_pose[1], robot_pose[2]))
     print("Waypoint was at [{}, {}, {}] \n \n".format(x_waypoint, y_waypoint, theta_waypoint))
 
-    #x_diff = np.mod(x_robot_pose, x_waypoint)
-    #y_diff = np.mod(y_robot_pose, y_waypoint)
-
-    #TODO Add thresholding/correction step ???
-
-    #theta_diff = np.mod(theta_robot_pose, theta_waypoint)
-
-    # threshold = 0.05
-    # angle_threshold = 
-    # if 
-
-
 def get_robot_pose():
-    ####################################################
-    # TODO: replace with your codes to estimate the pose of the robot
-    # We STRONGLY RECOMMEND you to use your SLAM code from M2 here
-
     # update the robot pose [x,y,theta]
     robot_pose = operate.ekf.robot.state
-
-    ####################################################
-
     return robot_pose
 
 def drive_update_slam(command,wheel_vel,turn_time):
     lv,rv = 0.0,0.0
+    # Make sure it is moving
     if not (command[0] == 0 and command[1] == 0): 
         if command[0] == 0:
+            # Turning
             lv,rv = ppi.set_velocity(command, turning_tick=wheel_vel, time=turn_time)
-        else: # 
-            lv,rv = ppi.set_velocity(command, tick=wheel_vel, time=turn_time)    
+        else: 
+            # Driving Straight
+            lv,rv = ppi.set_velocity(command, tick=wheel_vel, time=turn_time)  
+        # Operate commands  
         operate.take_pic()
         drive_meas = measure.Drive(lv, -rv, turn_time)
         operate.update_slam(drive_meas)
@@ -259,9 +240,8 @@ if __name__ == "__main__":
 
     backtrack_path = []
 
-
-    #TODO: Read in merge_estimations to generate targets.txt
     print('1')
+
     # read in the true map
     merge_aruco_fruit(args.slam, args.target)
     fruits_list, fruits_true_pos, aruco_true_pos = read_true_map(args.map)
@@ -269,11 +249,11 @@ if __name__ == "__main__":
     print_target_fruits_pos(search_list, fruits_list, fruits_true_pos)
     coords_order = target_fruits_pos_order(search_list, fruits_list, fruits_true_pos) # order of coords to go to for each fruit
 
-
     print('2')
     waypoint = [0.0,0.0]
     robot_pose = [0.0,0.0,0.0]
 
+    # Calibration Values
     clock = time.time()
     datadir = "calibration/param/"
     fileK = "{}intrinsic.txt".format(datadir)
@@ -285,9 +265,10 @@ if __name__ == "__main__":
     fileB = "{}baseline.txt".format(datadir)
     baseline = np.loadtxt(fileB, delimiter=',')
 
+    # Initialise Operate
     operate = Operate(args)
     
-    # run SLAM (from operate)
+    # Run SLAM (from operate)
     n_observed_markers = len(operate.ekf.taglist)
     if n_observed_markers == 0:
         if not operate.ekf_on:
@@ -307,60 +288,50 @@ if __name__ == "__main__":
             print('SLAM is paused')
 
 
-
+    # Add landmarks from SLAM run
     operate.add_markers(aruco_true_pos)
 
+    # Parameters for RRT*
     startpos = (0., 0.)
-
-    #TODO Add obstacle around arena
-
     obstacles = np.concatenate((fruits_true_pos, aruco_true_pos))  # merging list of obstacles together (Aruco markers and Fruits)
-
     
-    #TODO Test and change these values as needed
     n_iter = 300
-    radius = 0.18 # anything higher seems like we cannot get a decent path
+    radius = 0.22 
     stepSize = 0.5
-
 
     num_of_fruits = len(coords_order)
     fruits_found = 0
     
-    while fruits_found < num_of_fruits: #loop for every shopping list target
+    # Planning and pathing to fruit search list
+    while fruits_found < num_of_fruits: # loop for every shopping list target
         target = coords_order[fruits_found]
         need_to_backtrack = False
-
-        # DONE: Change endpos +- depending on which quadrant target is in
+        
+        # Making sure not driving straight onto fruit
+        fruit_threshold = 0.1
         if target[0] > 0:
-            newx = target[0] - 0.1
+            newx = target[0] - fruit_threshold
         else:
-            newx = target[0] + 0.1
+            newx = target[0] + fruit_threshold
 
         if target[1] > 0:
-            newy = target[1] - 0.1
+            newy = target[1] - fruit_threshold
         else:
-            newy = target[1] + 0.1
+            newy = target[1] + fruit_threshold
 
         endpos = (newx, newy)
         print('endpos: ', endpos)
         print('startpos: ', startpos)
 
         ## RRT star
-        #print(obstacles)
-        # print(obstacles)
-        # print(n_iter)
-        # print(radius)
-        # print(stepSize)
-
-
         G = RRT_star(startpos, endpos, obstacles, n_iter, radius, stepSize)
 
-        # DONE: increase n_iter linearly with num of failures
-        # TODO: backtrack by 1 step if failed fail_tolerance times
+        ## Backtracking to previous waypoints
         iter_fail = 0
         fail_tolerance = 4
-        num_of_paths_to_check = 3
+        num_of_paths_to_check = 10
 
+        # Checking if path planning is successful
         while not G.success:
             if iter_fail < fail_tolerance:
                 G = RRT_star(startpos, endpos, obstacles, 100*iter_fail + n_iter, radius, stepSize)
@@ -368,7 +339,8 @@ if __name__ == "__main__":
             else:
                 need_to_backtrack = True
                 break
-
+        
+        # Backtracking
         if need_to_backtrack:
             path = [startpos]
             backtrack_path.reverse()
@@ -378,6 +350,7 @@ if __name__ == "__main__":
                 if G.success:
                     break
         else:
+            # Choosing best RRT path planned
             minpath = dijkstra(G)
             min_waypoints = len(minpath)
             for _ in range(num_of_paths_to_check):
@@ -395,7 +368,7 @@ if __name__ == "__main__":
             plot(G, obstacles, radius, path)
 
         
-        # drive robot
+        # driving robot to each point in path
         for drive in path[1:]:
             robot_pose = get_robot_pose() 
             print("Robot pose: ", robot_pose)
@@ -406,28 +379,17 @@ if __name__ == "__main__":
             drive_meas = measure.Drive(lv, -rv, 0.0)
             operate.update_slam(drive_meas)
 
-        # Check distance from fruit
-        # xpos = endpos[0] - robot_pose[0]
-        # ypos = endpos[1] - robot_pose[1]
-        # dist_to_point = np.sqrt((xpos)**2+(ypos)**2)
-        
-        #print("Distance to waypoint is: ", dist_to_point)
-        
-        # Check if within 5 cm
-        # if dist_to_point > 0.5:
-        #     drive_to_point(endpos,robot_pose)
-                #TODO Run RRT_STAR Again
-
-        # Stop for 2 seconds
+        # Stop at target
         print("Arrived at target")
-        time.sleep(4)
+        time.sleep(4) # stop for at least 2 seconds
         robot_pose = get_robot_pose()
         x, y = robot_pose[0], robot_pose[1]
         print(robot_pose)
         
-        # Move startpos to endpos now
+        # Move startpos to endpos
         startpos = (float(x), float(y))
 
+    # End Run
     print("Finished auto fruit search!")
     time.sleep(5)
     exit()
