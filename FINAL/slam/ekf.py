@@ -86,13 +86,13 @@ class EKF:
 
     # the prediction step of EKF
     def predict(self, raw_drive_meas):
-        self.robot.drive(raw_drive_meas)
         A = self.state_transition(raw_drive_meas)
         x = self.get_state_vector()
-
+        self.robot.drive(raw_drive_meas)
         # TODO: add your codes here to complete the prediction step
         Q = self.predict_covariance(raw_drive_meas)
-
+        # NEW Tuning of covariance
+        Q = Q/10
         self.P = A @ self.P @ np.transpose(A) + Q
 
 
@@ -171,9 +171,9 @@ class EKF:
             self.P[-1,-1] = self.init_lm_cov**2
 
     ## Adding markers already known location 
-    def map_true_markers(self, marker_true_pos):
+    def adding_markers(self, marker_true_pos):
         # Pass in markers position from known position of true map
-        for i, marker in enumerate(marker_true_pos):
+        for (i, marker) in enumerate(marker_true_pos):
             self.taglist.append(i+1)
             marker = [[marker[0]], [marker[1]]]
             #print(marker)

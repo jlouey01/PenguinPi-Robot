@@ -123,8 +123,8 @@ class Operate:
             self.ekf.update(lms)
     
     # Adding in known position of markers
-    def add_markers(self, position):
-        self.ekf.map_true_markers(position)
+    def add_markers(self, marker_pos):
+        self.ekf.adding_markers(marker_pos)
 
     # using computer vision to detect targets
     def detect_target(self):

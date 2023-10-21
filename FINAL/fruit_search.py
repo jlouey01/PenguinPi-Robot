@@ -296,7 +296,7 @@ if __name__ == "__main__":
     obstacles = np.concatenate((fruits_true_pos, aruco_true_pos))  # merging list of obstacles together (Aruco markers and Fruits)
     
     n_iter = 300
-    radius = 0.22 
+    radius = 0.20
     stepSize = 0.5
 
     num_of_fruits = len(coords_order)

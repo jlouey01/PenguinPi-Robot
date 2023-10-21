@@ -1,7 +1,8 @@
 '''
 MIT License
 Copyright (c) 2019 Fanjin Zeng
-This work is licensed under the terms of the MIT license, see <https://opensource.org/licenses/MIT>.  
+This work is licensed under the terms of the MIT license, see <https://opensource.org/licenses/MIT>. 
+This is a modified version of the original code 
 '''
 
 import numpy as np
