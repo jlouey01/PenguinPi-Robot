@@ -18,7 +18,7 @@ python operate.py
 
 python TargetPoseEst_1.py
 
-python fruit_search.py 300 0.20 0.5
+python fruit_search.py 300 0.26 0.5
 
 
 Last case scenario:
