@@ -92,7 +92,7 @@ class EKF:
         # TODO: add your codes here to complete the prediction step
         Q = self.predict_covariance(raw_drive_meas)
         # NEW Tuning of covariance
-        Q = Q/10
+        #Q = Q/10
         self.P = A @ self.P @ np.transpose(A) + Q
 
 

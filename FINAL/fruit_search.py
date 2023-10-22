@@ -222,9 +222,17 @@ def drive_update_slam(command,wheel_vel,turn_time):
 # main loop
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("Fruit searching")
-    parser.add_argument("--map", type=str, default='Full_Map.txt') # change to 'M4_true_map_part.txt' for lv2&3
-    parser.add_argument('--slam', type=str, default='lab_output/slam.txt') # change
-    parser.add_argument('--target', type=str, default='lab_output/targets.txt') # change
+    # For RRT
+    parser.add_argument("n_iter", type=int, help="The number of iterations.")
+    parser.add_argument("radius", type=float, help="The radius of obstacles.")
+    parser.add_argument("stepSize", type=float, help="The step size of rrt.")
+
+    # For map
+    parser.add_argument("--map", type=str, default='Full_Map.txt')
+    parser.add_argument('--slam', type=str, default='lab_output/slam.txt')
+    parser.add_argument('--target', type=str, default='lab_output/targets.txt')
+    
+    #For robot
     parser.add_argument("--ip", metavar='', type=str, default='192.168.50.1')
     parser.add_argument("--port", metavar='', type=int, default=8080)
 
@@ -233,6 +241,8 @@ if __name__ == "__main__":
     parser.add_argument("--play_data", action='store_true')
     parser.add_argument("--yolo_model", default='YOLO/model/yolov8_model_2.pt')
     parser.add_argument("--calib_dir", type=str, default="calibration/param/")
+
+
 
     args, _ = parser.parse_known_args()
 
@@ -243,7 +253,7 @@ if __name__ == "__main__":
     print('1')
 
     # read in the true map
-    merge_aruco_fruit(args.slam, args.target)
+    #merge_aruco_fruit(args.slam, args.target)
     fruits_list, fruits_true_pos, aruco_true_pos = read_true_map(args.map)
     search_list = read_search_list()
     print_target_fruits_pos(search_list, fruits_list, fruits_true_pos)
@@ -295,9 +305,9 @@ if __name__ == "__main__":
     startpos = (0., 0.)
     obstacles = np.concatenate((fruits_true_pos, aruco_true_pos))  # merging list of obstacles together (Aruco markers and Fruits)
     
-    n_iter = 300
-    radius = 0.20
-    stepSize = 0.5
+    n_iter = args.n_iter
+    radius = args.radius
+    stepSize = args.stepSize
 
     num_of_fruits = len(coords_order)
     fruits_found = 0

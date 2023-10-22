@@ -145,9 +145,10 @@ class Graph:
     def randomPosition(self):
         rx = random()
         ry = random()
-
-        posx = max(-1.3, min(1.3, self.startpos[0] - (self.sx / 2.) + rx * self.sx * 2)) # DONE
-        posy = max(-1.3, min(1.3, self.startpos[1] - (self.sy / 2.) + ry * self.sy * 2))
+        
+        # bondaries of arena
+        posx = -1.4 + rx*2.8
+        posy = -1.4 + ry*2.8
         return posx, posy
 
 
