@@ -147,8 +147,8 @@ class Graph:
         ry = random()
         
         # bondaries of arena
-        posx = -1.4 + rx*2.8
-        posy = -1.4 + ry*2.8
+        posx = -1.45 + rx*2.9
+        posy = -1.45 + ry*2.9
         return posx, posy
 
 
